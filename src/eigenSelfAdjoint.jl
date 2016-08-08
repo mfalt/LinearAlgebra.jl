@@ -149,6 +149,7 @@ module EigenSelfAdjoint
         n = length(d)
         blockstart = 1
         blockend = n
+        rotations = Givens{T}[]
         @inbounds begin
             while true
                 # Check for zero off diagonal elements
@@ -173,7 +174,7 @@ module EigenSelfAdjoint
                     μ = d[blockend] - (e[blockend - 1]/(μ + copysign(r, μ)))
 
                     # QR bulk chase
-                    singleShiftQR!(S, μ, blockstart, blockend, vectors)
+                    singleShiftQR!(S, μ, blockstart, blockend, rotations)
 
                     debug && @printf("QR, blockstart: %d, blockend: %d, e[blockstart]: %e, e[blockend-1]:%e, d[blockend]: %f, μ: %f\n", blockstart, blockend, e[blockstart], e[blockend-1], d[blockend], μ)
                 end
@@ -252,7 +253,7 @@ module EigenSelfAdjoint
     end
 
     # Own implementation based on Parlett's book
-    function singleShiftQR!(S::SymTridiagonal, shift::Number, istart::Integer = 1, iend::Integer = length(S.dv), vectors = zeros(eltype(S), 0, size(S, 1)))
+    function singleShiftQR!(S::SymTridiagonal, shift::Number, istart::Integer = 1, iend::Integer = length(S.dv), rotations = zeros(LinAlg.Givens{eltype(S)}, size(S, 1)))
         d = S.dv
         e = S.ev
         n = length(d)
@@ -264,7 +265,8 @@ module EigenSelfAdjoint
             ei = e[i-1]
             ci1 = ci
             si1 = si
-            ci, si, ζ = givensAlgorithm(π, ei)
+            G, ζ = givensAlgorithm(π, ei)
+            ci, si = G.c, G.s
             if i > istart+1
                 e[i-2] = si1*ζ
             end
@@ -275,12 +277,13 @@ module EigenSelfAdjoint
             π = ci == 0 ? -ei*ci1 : γi/ci
 
             # update eigen vectors
-            for k = 1:size(vectors, 1)
-                v1 = vectors[k, i - 1]
-                v2 = vectors[k, i]
-                vectors[k, i - 1]     = ci*v1 + si*v2
-                vectors[k, i] = ci*v2 - si*v1
-            end
+            # for k = 1:size(vectors, 1)
+            #     v1 = vectors[k, i - 1]
+            #     v2 = vectors[k, i]
+            #     vectors[k, i - 1]     = ci*v1 + si*v2
+            #     vectors[k, i] = ci*v2 - si*v1
+            # end
+            push!(rotations, G)
         end
         e[iend-1] = si*π
         d[iend] = shift + γi

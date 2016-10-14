@@ -1,7 +1,9 @@
 module LAPACK2
 
     using Base.LinAlg: BlasInt, chkstride1, LAPACKException
-
+    using Base.LinAlg.BLAS: liblapack
+    
+    chkuplo(c::Char) = (c != 'U' && c != 'L' && error("Ivvalid char $c, should either be U or L"))
     # LAPACK wrappers
 
     if VERSION < v"0.5.0-dev"
